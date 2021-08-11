@@ -2,12 +2,16 @@ import Head from "next/head";
 import Image from "next/image";
 import styles from "../styles/Home.module.css";
 import { AmplifySignOut } from "@aws-amplify/ui-react";
-import { API, graphqlOperation } from "aws-amplify";
+import { API, graphqlOperation, Storage } from "aws-amplify";
 import { listSongs } from "../src/graphql/queries";
 import { updateSong } from "../src/graphql/mutations";
 import { useEffect, useState } from "react";
+import ReactPlayer from "react-player";
+
 export default function Home() {
   const [songs, setSongs] = useState([]);
+  const [songPlaying, setSongPlaying] = useState(null);
+  const [audioURL, setAudioURL] = useState("");
 
   const fetchSongs = async () => {
     try {
@@ -41,6 +45,26 @@ export default function Home() {
       console.log("error adding like", err);
     }
   };
+
+  const toggleSong = async (idx) => {
+    if (songPlaying === idx) {
+      setSongPlaying(null);
+    } else {
+      const songFilePath = songs[idx].filePath;
+      try {
+        const fileAccessURL = await Storage.get(songFilePath, { expires: 60 });
+        console.log("access URL", fileAccessURL);
+        setSongPlaying(idx);
+        setAudioURL(fileAccessURL);
+      } catch (err) {
+        console.log("error accessing the file from s3", err);
+        setAudioURL("");
+        setSongPlaying(null);
+      }
+    }
+  };
+
+  console.log(songPlaying);
   return (
     <div className={styles.container}>
       <Head>
@@ -54,10 +78,21 @@ export default function Home() {
         <div key={song.id + song.title}>
           <p>title: {song.title}</p>
           <p>owner: {song.owner}</p>
-          <p onClick={() => addLike(idx)}>likes: {song.like}</p>
+          <p>likes: {song.like}</p>
           <p>description: {song.description}</p>
-          <p>created:{song.createdAt}</p>
-          <p>updated:{song.updatedAt}</p>
+          <p onClick={() => toggleSong(idx)}>
+            {songPlaying === idx ? "Pasue" : "Play"}
+          </p>
+          <p onClick={() => addLike(idx)}>Like</p>
+          {songPlaying === idx && (
+            <ReactPlayer
+              url={audioURL}
+              controls
+              playing
+              height="50px"
+              onPause={() => toggleSong(idx)}
+            />
+          )}
         </div>
       ))}
     </div>
